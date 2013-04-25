@@ -720,9 +720,6 @@ class OAuthUtil {
   if (is_array($input)) {
     return array_map(array('OAuthUtil', 'urlencode_rfc3986'), $input);
   } else if (is_scalar($input)) {
-      if(get_magic_quotes_gpc()){
-          $input = stripslashes($input);
-      }
     return str_replace(
       '+',
       ' ',
@@ -806,14 +803,6 @@ class OAuthUtil {
           );
           $out[$key] = $value;
         }
-        if (substr($key, 0, 14) == "REDIRECT_HTTP_") {
-          $key = str_replace(
-            " ",
-            "-",
-            ucwords(strtolower(str_replace("_", " ", substr($key, 14))))
-          );
-          $out[$key] = $value;
-        }
       }
     }
     return $out;
@@ -881,5 +870,3 @@ class OAuthUtil {
     return implode('&', $pairs);
   }
 }
-
-?>
