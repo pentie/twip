@@ -174,6 +174,7 @@ class twip{
             echo 'click <a href="'.$this->base_url.'oauth.php">HERE</a> to get your API url';
             return;
         }
+        $this->request_headers = OAuthUtil::get_headers();
         $this->parameters = $this->get_parameters();
         $this->uri_fixer();
         $this->connection = new TwitterOAuth($this->oauth_key, $this->oauth_secret, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
@@ -230,9 +231,12 @@ class twip{
             strpos(@$this->request_headers['Content-Type'], 'multipart/form-data') !== FALSE) {
             $this->parameters = $_POST;
             if(count($_FILES) > 0) {
-                $media = @$_FILES['media'];
-                $fn = $media['tmp_name'][0];
-                $this->parameters["media"] = '@' . $fn;
+                $tmp_name = @$_FILES['media']['tmp_name'];
+                if(is_array($tmp_name))
+                    $fn = $tmp_name[0];
+                else
+                    $fn = $tmp_name;
+                $this->parameters["media[]"] = '@' . $fn;
                 unset($this->request_headers['Content-Type']);
             }
         }
