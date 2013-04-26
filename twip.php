@@ -175,7 +175,8 @@ class twip{
             return;
         }
         $this->request_headers = OAuthUtil::get_headers();
-        $this->parameters = $this->get_parameters();
+        //$this->parameters = $this->get_parameters();
+        $this->parameters = $_POST;
         $this->uri_fixer();
         $this->connection = new TwitterOAuth($this->oauth_key, $this->oauth_secret, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
 
@@ -184,6 +185,7 @@ class twip{
         } else {
             $type = 'xml';
         }
+
 
         // Add include_entities arg if not exists and API is configured to expand t.co
         if($this->o_mode_parse_entities && !isset($_REQUEST['include_entities'])){
@@ -195,9 +197,33 @@ class twip{
             }
         }
 
+
+        if(strpos($this->request_uri,'statuses/update_with_media') !== FALSE &&
+            strpos(@$this->request_headers['Content-Type'], 'multipart/form-data') !== FALSE) {
+            $this->parameters = $_POST;
+            if(count($_FILES) > 0) {
+                $media = @$_FILES['media'];
+
+                if(is_array($media['tmp_name'])) {
+                    $fn = $media['tmp_name'][0];
+                } else {
+                    $fn = $media['tmp_name'];
+                }
+
+                $this->parameters["media"] = '@' . $fn;
+                unset($this->request_headers['Content-Type']);
+                $this->method = 'POST_MULTIPART';
+            }
+        }
+
+
         switch($this->method){
+            case 'POST_MULTIPART':
+                echo $this->connection->oAuthRequestMultiPost($this->request_uri,$this->parameters);
+                break;
             case 'POST':
-                echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters), $type);
+                echo $this->connection->oAuthRequestMultiPost($this->request_uri,$this->parameters);
+                //echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters), $type);
                 break;
             case 'DELETE':
                 echo $this->parse_entities($this->connection->delete($this->request_uri,$this->parameters), $type);
