@@ -180,6 +180,8 @@ class TwitterOAuth {
     switch ($method) {
     case 'GET':
       return $this->http($request->to_url(), 'GET');
+    case 'POST_MULTIPART':
+      return $this->http($request->get_normalized_http_url(), $method, $request->get_parameters()); //FIX
     default:
       return $this->http($request->get_normalized_http_url(), $method, $request->to_postdata());
     }
@@ -206,6 +208,11 @@ class TwitterOAuth {
     switch ($method) {
       case 'POST':
         curl_setopt($ci, CURLOPT_POST, TRUE);
+        if (!empty($postfields)) {
+          curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
+        }
+        break;
+      case 'POST_MULTIPART':
         if (!empty($postfields)) {
           curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
         }

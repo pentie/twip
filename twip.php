@@ -194,7 +194,25 @@ class twip{
             }
         }
 
+
+        if(strpos($this->request_uri,'statuses/update_with_media') !== FALSE &&
+            strpos(@$this->request_headers['Content-Type'], 'multipart/form-data') !== FALSE) {
+            $this->parameters = $_POST;
+            if(count($_FILES) > 0) {
+                $media = @$_FILES['media'];
+                $fn = $media['tmp_name'][0];
+                $this->parameters["media"] = '@' . $fn;
+                unset($this->request_headers['Content-Type']);
+
+                $this->method = 'POST_MULTIPART';
+            }
+        }
+
+
         switch($this->method){
+            case 'POST_MULTIPART':
+                echo $this->connection->oAuthRequest($this->request_uri,'POST_MULTIPART',$this->parameters);
+                break;
             case 'POST':
                 echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters), $type);
                 break;
