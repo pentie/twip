@@ -871,12 +871,22 @@ class OAuthUtil {
   }
 
   public static function build_oauth_header($params) {
-      $auth = 'OAuth ';
-      foreach($params as $k => $v) {
-          if(substr($k, 0, 6) === 'oauth_') {
-              $auth .= rawurlencode($k) . '="' . rawurlencode($v) . '", ';
-          }
-      }
-      return trim($auth, ", ");
+
+        $r = 'Authorization: OAuth ';
+        $values = array();
+        foreach($params as $key=>$value) {
+            if(substr($key, 0, 6) === 'oauth_') {
+                $values[] = "$key=\"" . rawurlencode($value) . "\"";
+            }
+        }
+        $r .= implode(', ', $values);
+        return $r;
+  }
+
+  public static function build_query_params($params) {
+    // Urlencode both keys and values
+    $keys = OAuthUtil::urlencode_rfc3986(array_keys($params));
+    $values = OAuthUtil::urlencode_rfc3986(array_values($params));
+    return array_combine($keys, $values);
   }
 }

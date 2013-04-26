@@ -210,7 +210,7 @@ class twip{
                     $fn = $media['tmp_name'];
                 }
 
-                $this->parameters["media"] = '@' . $fn;
+                $this->parameters["media[]"] = '@' . $fn;
                 unset($this->request_headers['Content-Type']);
                 $this->method = 'POST_MULTIPART';
             }
@@ -221,9 +221,10 @@ class twip{
             case 'POST_MULTIPART':
                 echo $this->connection->oAuthRequestMultiPost($this->request_uri,$this->parameters);
                 break;
-            case 'POST':
-                echo $this->connection->oAuthRequestMultiPost($this->request_uri,$this->parameters);
-                //echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters), $type);
+           case 'POST':
+                //echo $this->connection->oAuthRequestMultiPost($this->request_uri,$this->parameters);
+                echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters), $type);
+                //echo "nononon\n";
                 break;
             case 'DELETE':
                 echo $this->parse_entities($this->connection->delete($this->request_uri,$this->parameters), $type);

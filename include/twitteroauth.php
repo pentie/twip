@@ -175,13 +175,16 @@ class TwitterOAuth {
     if (strrpos($url, 'https://') !== 0 && strrpos($url, 'http://') !== 0) {
       $url = "{$this->host}{$url}.{$this->format}";
     }
-    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, $parameters);
+    //$request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, $parameters);
+    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, NULL);
     $request->sign_request($this->sha1_method, $this->consumer, $this->token);
     switch ($method) {
     case 'GET':
       return $this->http($request->to_url(), 'GET');
     default:
-      return $this->http($request->get_normalized_http_url(), $method, $request->to_postdata());
+      $params = $request->get_parameters();
+      $authheader = OAuthUtil::build_oauth_header($params);
+      return $this->http($request->get_normalized_http_url(), $method, $parameters, $authheader);
     }
   }
 
@@ -194,11 +197,15 @@ class TwitterOAuth {
     if (strrpos($url, 'https://') !== 0 && strrpos($url, 'http://') !== 0) {
       $url = "{$this->host}{$url}.{$this->format}";
     }
-    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, $parameters);
+
+    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, NULL);
     $request->sign_request($this->sha1_method, $this->consumer, $this->token);
     $params = $request->get_parameters();
+    print_r($params);
     $authheader = OAuthUtil::build_oauth_header($params);
-    return $this->http($request->get_normalized_http_url(), $method, $parameters, $authheader); //FIX
+    return $this->http($request->get_normalized_http_url(), $method, $parameters, $authheader);
+
+    //return $this->http($request->get_normalized_http_url(), $method, $parameters, $authheader); //FIX
   }
 
   /**
@@ -214,26 +221,38 @@ class TwitterOAuth {
     curl_setopt($ci, CURLOPT_CONNECTTIMEOUT, $this->connecttimeout);
     curl_setopt($ci, CURLOPT_TIMEOUT, $this->timeout);
     curl_setopt($ci, CURLOPT_RETURNTRANSFER, TRUE);
-    //curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
     curl_setopt($ci, CURLOPT_SSL_VERIFYPEER, $this->ssl_verifypeer);
     curl_setopt($ci, CURLOPT_HEADERFUNCTION, array($this, 'getHeader'));
     curl_setopt($ci, CURLOPT_HEADER, FALSE);
 
+    curl_setopt($ci, CURLOPT_HTTPPROXYTUNNEL, TRUE);
+    curl_setopt($ci, CURLOPT_PROXY, '127.0.0.1:8124');
+
+    if($authheader !== NULL) {
+        curl_setopt($ci, CURLOPT_HTTPHEADER, array($authheader, 'Expect:'));
+    } else {
+        curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
+    }
+
+
     switch ($method) {
       case 'POST':
         curl_setopt($ci, CURLOPT_POST, TRUE);
-        curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
+        echo "---POST\n";
+        print_r($authheader);
+        echo "\n---POST\n";
+        print_r($postfields);
         if (!empty($postfields)) {
           curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
         }
         break;
       case 'POST_MULTIPART':
-          $fw_head = array( 'Expect:', 'Authorization: ' . $authheader);
-          print_r($fw_head);
-          print_r($postfields);
-          curl_setopt($ci, CURLOPT_HTTPHEADER, $authheader);
+        echo "\n---MULT\n";
+        print_r($authheader);
+        echo "\n---MULT\n";
+        print_r($postfields);
+        echo "---MULT\n\n\n";
           curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
-
         break;
       case 'DELETE':
         curl_setopt($ci, CURLOPT_CUSTOMREQUEST, 'DELETE');
