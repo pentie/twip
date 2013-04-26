@@ -180,11 +180,25 @@ class TwitterOAuth {
     switch ($method) {
     case 'GET':
       return $this->http($request->to_url(), 'GET');
-    case 'POST_MULTIPART':
-      return $this->http($request->get_normalized_http_url(), $method, $request->get_parameters()); //FIX
     default:
       return $this->http($request->get_normalized_http_url(), $method, $request->to_postdata());
     }
+  }
+
+
+  /**
+   * Format and sign an OAuth / API request
+   */
+  function oAuthRequestMultiPost($url, $parameters) {
+    $method = 'POST_MULTIPART';
+    if (strrpos($url, 'https://') !== 0 && strrpos($url, 'http://') !== 0) {
+      $url = "{$this->host}{$url}.{$this->format}";
+    }
+    $request = OAuthRequest::from_consumer_and_token($this->consumer, $this->token, $method, $url, $parameters);
+    $request->sign_request($this->sha1_method, $this->consumer, $this->token);
+    $params = $request->get_parameters();
+    $authheader = OAuthUtil::build_oauth_header($params);
+    return $this->http($request->get_normalized_http_url(), $method, $parameters, $authheader); //FIX
   }
 
   /**
@@ -192,7 +206,7 @@ class TwitterOAuth {
    *
    * @return API results
    */
-  function http($url, $method, $postfields = NULL) {
+  function http($url, $method, $postfields = NULL, $authheader = NULL) {
     $this->http_info = array();
     $ci = curl_init();
     /* Curl settings */
@@ -200,7 +214,7 @@ class TwitterOAuth {
     curl_setopt($ci, CURLOPT_CONNECTTIMEOUT, $this->connecttimeout);
     curl_setopt($ci, CURLOPT_TIMEOUT, $this->timeout);
     curl_setopt($ci, CURLOPT_RETURNTRANSFER, TRUE);
-    curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
+    //curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
     curl_setopt($ci, CURLOPT_SSL_VERIFYPEER, $this->ssl_verifypeer);
     curl_setopt($ci, CURLOPT_HEADERFUNCTION, array($this, 'getHeader'));
     curl_setopt($ci, CURLOPT_HEADER, FALSE);
@@ -208,14 +222,18 @@ class TwitterOAuth {
     switch ($method) {
       case 'POST':
         curl_setopt($ci, CURLOPT_POST, TRUE);
+        curl_setopt($ci, CURLOPT_HTTPHEADER, array('Expect:'));
         if (!empty($postfields)) {
           curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
         }
         break;
       case 'POST_MULTIPART':
-        if (!empty($postfields)) {
+          $fw_head = array( 'Expect:', 'Authorization: ' . $authheader);
+          print_r($fw_head);
+          print_r($postfields);
+          curl_setopt($ci, CURLOPT_HTTPHEADER, $authheader);
           curl_setopt($ci, CURLOPT_POSTFIELDS, $postfields);
-        }
+
         break;
       case 'DELETE':
         curl_setopt($ci, CURLOPT_CUSTOMREQUEST, 'DELETE');

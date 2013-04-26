@@ -869,4 +869,14 @@ class OAuthUtil {
     // Each name-value pair is separated by an '&' character (ASCII code 38)
     return implode('&', $pairs);
   }
+
+  public static function build_oauth_header($params) {
+      $auth = 'OAuth ';
+      foreach($params as $k => $v) {
+          if(substr($k, 0, 6) === 'oauth_') {
+              $auth .= rawurlencode($k) . '="' . rawurlencode($v) . '", ';
+          }
+      }
+      return trim($auth, ", ");
+  }
 }
