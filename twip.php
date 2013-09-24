@@ -14,30 +14,36 @@ class twip{
         if(!isset($status->entities)){
             return;
         }
+
+        $shift=0;
         mb_internal_encoding('UTF-8');
 
         if(isset($status->entities->urls)){
-            $a = array_reverse($status->entities->urls);
-            foreach($a as &$url){
+            foreach($status->entities->urls as &$url){
                 if($url->expanded_url){
+                    $url->indices[0] += $shift;
+                    $url->indices[1] += $shift;
                     $status->text = mb_substr($status->text, 0, $url->indices[0]) . $url->expanded_url . mb_substr($status->text, $url->indices[1]);
                     $url->indices[1] = $url->indices[0] + mb_strlen($url->expanded_url);
+                    $diff = mb_strlen($url->expanded_url) - mb_strlen($url->url);
+                    $shift += $diff;
                     $url->url = $url->expanded_url;
                 }
             }
-            $status->entities->urls = array_reverse($a);
         }
 
         if(!isset($status->entities->media)){
             return;
         }
-        $a = array_reverse($status->entities->media);
         foreach($status->entities->media as &$media){
+            $media->indices[0] += $shift;
+            $media->indices[1] += $shift;
             $status->text = mb_substr($status->text, 0, $media->indices[0]) . $media->media_url_https . mb_substr($status->text, $media->indices[1]);
             $media->indices[1] = $media->indices[0] + mb_strlen($media->media_url_https);
+            $diff = mb_strlen($media->media_url_https) - mb_strlen($media->url);
+            $shift += $diff;
             $media->url = $media->media_url_https;
         }
-        $status->entities->media = array_reverse($a);
     }
 
     public function json_x86_decode($in){
@@ -124,6 +130,8 @@ class twip{
         $this->compress = isset($options['compress']) ? !!$options['compress'] : FALSE;
         $this->oauth_key = $options['oauth_key'];
         $this->oauth_secret = $options['oauth_secret'];
+        $this->oauth_key_get = $options['oauth_key_get'];
+        $this->oauth_secret_get = $options['oauth_secret_get'];
         $this->o_mode_parse_entities = isset($options['o_mode_parse_entities']) ? !!$options['o_mode_parse_entities'] : FALSE;
 
         if(substr($this->parent_api, -1) !== '/') $this->parent_api .= '/';
@@ -153,6 +161,7 @@ class twip{
         }
         $access_token = unserialize($access_token);
         $this->access_token = $access_token;
+        $this->has_get_token = isset($access_token['oauth_token_get']);
 
         if(preg_match('!oauth/access_token\??!', $this->request_uri)){
             $this->echo_token();
@@ -175,6 +184,7 @@ class twip{
         $this->parameters = $this->get_parameters();
         $this->uri_fixer();
         $this->connection = new TwitterOAuth($this->oauth_key, $this->oauth_secret, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
+        $this->connection_get = $this->has_get_token ? new TwitterOAuth($this->oauth_key_get, $this->oauth_secret_get, $this->access_token['oauth_token_get'], $this->access_token['oauth_token_secret_get']) : $this->connection;
 
 
         // Process with update_with_media
@@ -223,7 +233,7 @@ class twip{
                 echo $this->parse_entities($this->connection->post($this->request_uri,$this->parameters));
                 break;
             default:
-                echo $this->parse_entities($this->connection->get($this->request_uri));
+                echo $this->parse_entities($this->connection_get->get($this->request_uri));
                 break;
         }
     }
