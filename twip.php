@@ -80,8 +80,16 @@ class twip{
         return $status;
     }
 
-    public function twip($options = null){
+
+
+    function __construct($options = null){
         $this->parse_variables($options);
+
+        # Import all filters
+        foreach(glob('filters/*.php') as $f) {
+            include_once($f);
+        }
+        unset($f);
 
         ob_start();
         $compressed = $this->compress && Extension_Loaded('zlib') && ob_start("ob_gzhandler");
@@ -114,11 +122,6 @@ class twip{
         if($this->dolog){
             file_put_contents('log',$this->method.' '.$this->request_uri."\n",FILE_APPEND);
         }
-    }
-
-    private function echo_token(){
-            $str = 'oauth_token='.$this->access_token['oauth_token']."&oauth_token_secret=".$this->access_token['oauth_token_secret']."&user_id=".$this->access_token['user_id']."&screen_name=".$this->access_token['screen_name'].'&x_auth_expires=0'."\n";
-            echo $str;
     }
 
     private function parse_variables($options){
@@ -163,11 +166,6 @@ class twip{
         $this->access_token = $access_token;
         $this->has_get_token = isset($access_token['oauth_token_get']);
 
-        if(preg_match('!oauth/access_token\??!', $this->request_uri)){
-            $this->echo_token();
-            return;
-        }
-
         if($imageproxy){
             if($this->method=='POST'){
                 echo imageUpload($this->oauth_key, $this->oauth_secret, $this->access_token);
@@ -185,6 +183,18 @@ class twip{
         $this->uri_fixer();
         $this->connection = new TwitterOAuth($this->oauth_key, $this->oauth_secret, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
         $this->connection_get = $this->has_get_token ? new TwitterOAuth($this->oauth_key_get, $this->oauth_secret_get, $this->access_token['oauth_token_get'], $this->access_token['oauth_token_secret_get']) : $this->connection;
+
+        $filterName = Twip::encode_uri($this->forwarded_request_uri);
+        if (!array_key_exists($filterName, $this->filters)) {
+            $filterName = '_default';
+        }
+        echo $this->filters[$filterName](array(
+            'path' => $this->forwarded_request_uri,
+            'method' => $this->method,
+            'params' => $this->parameters,
+            'self' => $this,
+        ));
+        return;
 
 
         // Process with update_with_media
@@ -333,20 +343,30 @@ class twip{
     }
 
     private function parse_request_uri(){
-        $full_request_uri = substr($_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'],strlen(preg_replace('/^https?:\/\//i','',$this->base_url)));
-        if(strpos($full_request_uri,'o/')===0){
-            list($this->mode,$this->password,$this->request_uri) = explode('/',$full_request_uri,3);
-            $this->mode = 'o';
+        // old value
+        //$full_request_uri = substr($_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'],strlen(preg_replace('/^https?:\/\//i','',$this->base_url)));
+        $full_request_uri = substr(
+            $_SERVER['REQUEST_URI'],
+            strlen(dirname($_SERVER['SCRIPT_NAME'])));
+
+        $prefix = substr($full_request_uri, 0, 3);
+        switch($prefix) {
+            case '/o/':
+                $this->mode = 'o';
+                break;
+            case '/t/':
+                $this->mode = 't';
+                break;
+            case '/i/':
+                $this->mode = 'i';
+                break;
+            default:
+                $this->mode = 'UNKNOWN';
+                break;
         }
-        elseif(strpos($full_request_uri,'t/')===0){
-            list($this->mode,$this->request_uri) = explode('/',$full_request_uri,2);
-            $this->mode = 't';
-        }
-        elseif(strpos($full_request_uri,'i/')===0){
-            list($this->mode,$this->password,$this->request_uri) = explode('/',$full_request_uri,3);
-            $this->mode = 'i';
-        }
-        $this->request_uri = preg_replace('/\/+/','/',$this->request_uri);
+        list($this->password, $forwarded_request_uri) = explode('/',
+            substr($full_request_uri, 3), 2);
+        $this->forwarded_request_uri = $this->request_uri = $forwarded_request_uri;
     }
 
     private function headerfunction($ch,$str){
@@ -363,6 +383,19 @@ class twip{
         $ret = array();
         parse_str($data,$ret);
         return $ret;
+    }
+
+    public static function encode_uri($raw_uri) {
+        $parts = parse_url($raw_uri);
+        $replacements = array(
+            '/' => '__',
+            '.' => '_',
+        );
+        return str_replace(
+            array_keys($replacements),
+            array_values($replacements),
+            $parts['path']
+        );
     }
 }
 ?>
