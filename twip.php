@@ -204,7 +204,6 @@ class twip{
 
     private function transparent_mode(){
         $this->uri_fixer();
-        $ch = curl_init($this->request_uri);
         $this->request_headers = OAuthUtil::get_headers();
 
         // Don't parse POST arguments as array if emulating a browser submit
@@ -228,21 +227,29 @@ class twip{
             }
         }
 
+        $this->request_headers['Host'] = 'api.twitter.com';
+        $this->request_headers['Accept-Encoding'] = 'gzip';
+
         $forwarded_headers = array(
+            'Host',
             'User-Agent',
             'Authorization',
             'Content-Type',
-            'X-Forwarded-For',
-            'Expect',
+            'Accept-Encoding'
             );
+
         foreach($forwarded_headers as $header){
             if(isset($this->request_headers[$header])){
                 $this->forwarded_headers[] = $header.': '.$this->request_headers[$header];
             }
         }
-        if(!isset($this->forwarded_headers['Expect'])) $this->forwarded_headers[] = 'Expect:';
+
+        $ch = curl_init($this->request_uri);
         curl_setopt($ch,CURLOPT_HTTPHEADER,$this->forwarded_headers);
         curl_setopt($ch,CURLOPT_HEADERFUNCTION,array($this,'headerfunction'));
+        curl_setopt($ch,CURLOPT_ENCODING , '');
+        curl_setopt($ch,CURLOPT_CONNECTTIMEOUT, 45);
+        curl_setopt($ch,CURLOPT_TIMEOUT, 45); //timeout in seconds
         if($this->method != 'GET'){
             curl_setopt($ch,CURLOPT_CUSTOMREQUEST,$this->method);
             curl_setopt($ch,CURLOPT_POSTFIELDS,$this->parameters);
@@ -264,19 +271,10 @@ class twip{
         // If user specified version, use that version. Else use default version
         $version = ($version == "") ? $this->api_version : $version;
 
-        $this->request_headers['Host'] = 'api.twitter.com';
-
         if($version === "1") {
             header("HTTP/1.0 410 Gone");
             die();
         }
-
-        $replacement = array(
-            'pc=true' => 'pc=false', //change pc=true to pc=false
-            '&earned=true' => '', //remove "&earned=true"
-        );
-
-        $api = str_replace(array_keys($replacement), array_values($replacement), $api);
 
         if( strpos($api,'oauth/') === 0 ) {
             // These API requests don't needs version string
